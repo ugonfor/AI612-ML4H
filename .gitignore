@@ -1,0 +1,4 @@
+dataset
+*.npy
+__pycache__
+filtered_dataset
