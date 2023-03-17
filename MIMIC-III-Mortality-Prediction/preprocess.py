@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Set
 from type_def import ICUSTAY_Entity
+from datetime import datetime, timedelta
 
 def filtering_time(input_path: str, output_path: str):
     '''
@@ -118,8 +119,110 @@ def init_ADMISSIONS(input_path: str, icu_data : List[ICUSTAY_Entity]) -> List[IC
             new_ICUSTAY_entity.append(entity)
 
     return new_ICUSTAY_entity
+
+def Label_check(icu_data : List[ICUSTAY_Entity]) -> List[ICUSTAY_Entity]:
+
+    # If death occur before the INTIME, exclude that entity
+    exclude = []
+
+    for i in range(len(icu_data)):
+        entity = icu_data[i]
+
+        # if dead
+        if entity.DEATHTIME != None:
+            IN = datetime.strptime(entity.INTIME.decode(), '%Y-%m-%d %H:%M:%S')
+            OUT = datetime.strptime(entity.OUTTIME.decode(), '%Y-%m-%d %H:%M:%S')
+            DEA = datetime.strptime(entity.DEATHTIME.decode(), '%Y-%m-%d %H:%M:%S')
+
+            # If death occur before the INTIME, exclude this
+            if DEA < IN:
+                exclude.append(i)
+                continue
+            
+            # labeling
+            if OUT < DEA:
+                entity.label = 0
+            else:
+                entity.label = 1
+
+        # if alived
+        else:
+            entity.label = 0
+    
+    # for avoid indexing error, [::-1] 
+    for num in exclude[::-1]:
+        del icu_data[num]
+    
+    return icu_data
+    
+def Filtering_CHARTEVENTS(input_path: str, output_path: str, icu_data: List[ICUSTAY_Entity]):
+    '''
+    filtering the CHARTEVENTS table
+    opt 1. ICUSTAY_ID in icu_data
+    opt 2. CHARTTIME <= ICUSTAY_ENTITY.INTIME + 3hours
+
+    arg: 
+        input_path: CHARTEVENTS.cvs file path
+        output_path: Filtered CHARTEVENTS csv file path
+    '''
+
+    # collect icustay_ids
+    # use this to filtering CHARTEVENTS.csv 
+    ICUSTAY_ID_SET = set(map(lambda x: x.ICUSTAY_id, icu_data))
+
+    # to use icustay - entity pair
+    import utils
+    icustay_dict = utils.icustay_id_dict(icu_data)
+    for key in icustay_dict:
+        tmp = icustay_dict[key].INTIME
+        icustay_dict[key] = datetime.strptime(tmp.decode(), '%Y-%m-%d %H:%M:%S')
         
 
+    fin = open(input_path, "rb")
+    fout = open(output_path, "wb")
+
+    # for pass the first line (csv file)
+    fout.write(fin.readline())
+
+    # for progress
+    idx = 0
+    while 1:
+        idx += 1
+        if idx % 10000 == 0:
+            print(idx)
+
+        line = fin.readline().strip()
+        
+        # check done
+        if line == b"":
+            break
+        
+        # check ICUSTAY_ID exist?
+        ICUSTAY_ID = line.split(b",")[3]
+        
+        if ICUSTAY_ID == b"":
+            continue
+
+        ICUSTAY_ID = int(ICUSTAY_ID)
+        if ICUSTAY_ID not in ICUSTAY_ID_SET:
+            continue
+        
+        # check CHARTTIME
+        CHARTTIME = line.split(b",")[5]
+
+        if CHARTTIME == b"":
+            continue
+
+        CHARTTIME = datetime.strptime(CHARTTIME.decode(), '%Y-%m-%d %H:%M:%S')
+        INTIME = icustay_dict[ICUSTAY_ID]
+
+        if INTIME + timedelta(hours=3) < CHARTTIME:
+            continue
+        
+        fout.write(line + b"\n")
+
+def init_CHARTEVENTS(icu_data : List[ICUSTAY_Entity]) -> List[ICUSTAY_Entity]:
+    pass
 
 def test():
     N = 10
@@ -137,12 +240,24 @@ import sys
 ICUSTAYS_PATH = "./dataset/ICUSTAYS.csv"
 FILTERED_ICUSTAYS_PATH = "./filtered_dataset/ICUSTAYS.csv"
 ADMISSIONS_PATH = "./dataset/ADMISSIONS.csv"
+CHAREVENTS_PATH = "./dataset/CHARTEVENTS.csv"
+FILTERED_CHAREVENTS_PATH = "./filtered_dataset/CHARTEVENTS.csv"
 ICU_DATA = None
 
 if __name__ == "__main__":
-    #filtering_time(ICUSTAYS_PATH, FILTERED_ICUSTAYS_PATH)
-    print("1")
-    ICU_DATA = init_ICUSTAYS(FILTERED_ICUSTAYS_PATH)
-    print("2")
-    ICU_DATA = init_ADMISSIONS(ADMISSIONS_PATH, ICU_DATA)
-    print(ICU_DATA)
+    # filtering_time(ICUSTAYS_PATH, FILTERED_ICUSTAYS_PATH)
+    # print("1")
+    # ICU_DATA = init_ICUSTAYS(FILTERED_ICUSTAYS_PATH)
+    # print("2")
+    # ICU_DATA = init_ADMISSIONS(ADMISSIONS_PATH, ICU_DATA)
+    # ICU_DATA = Label_check(ICU_DATA)
+
+    from utils import pause
+    ICU_DATA = pause('ICU_DATA', type='resume')
+
+    print(len(ICU_DATA))
+    import utils
+    utils.icustay_id_time_dict_write(ICU_DATA)
+    # Filtering_CHARTEVENTS(CHAREVENTS_PATH, FILTERED_CHAREVENTS_PATH, ICU_DATA)
+
+    # ICU_DATA = pause('ICU_DATA', type='stop', data=ICU_DATA)

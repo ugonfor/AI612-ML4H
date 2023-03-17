@@ -1,3 +1,7 @@
+class CHART_EVENT:
+    pass
+
+
 
 class ICUSTAY_Entity:
     def __init__(self) -> None:
