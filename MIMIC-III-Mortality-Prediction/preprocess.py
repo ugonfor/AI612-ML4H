@@ -242,6 +242,7 @@ FILTERED_ICUSTAYS_PATH = "./filtered_dataset/ICUSTAYS.csv"
 ADMISSIONS_PATH = "./dataset/ADMISSIONS.csv"
 CHAREVENTS_PATH = "./dataset/CHARTEVENTS.csv"
 FILTERED_CHAREVENTS_PATH = "./filtered_dataset/CHARTEVENTS.csv"
+ICUSTAY_ID_TIME_PAIR_PATH = "./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv"
 ICU_DATA = None
 
 if __name__ == "__main__":
@@ -255,9 +256,13 @@ if __name__ == "__main__":
     from utils import pause
     ICU_DATA = pause('ICU_DATA', type='resume')
 
-    print(len(ICU_DATA))
     import utils
-    utils.icustay_id_time_dict_write(ICU_DATA)
+    utils.icustay_id_time_dict_write(ICU_DATA, ICUSTAY_ID_TIME_PAIR_PATH)
+
+    # g++ -o chartevents_filter ./chartevents_filter.cpp
+    # ./chartevents_filter ./dataset/CHARTEVENTS.csv ./filtered_dataset/CHARTEVENTS.csv ./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv
+    
+
     # Filtering_CHARTEVENTS(CHAREVENTS_PATH, FILTERED_CHAREVENTS_PATH, ICU_DATA)
 
     # ICU_DATA = pause('ICU_DATA', type='stop', data=ICU_DATA)

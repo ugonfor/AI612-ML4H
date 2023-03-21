@@ -19,14 +19,15 @@ def icustay_id_dict(ICU_DATA: List[ICUSTAY_Entity]) -> Dict[int, ICUSTAY_Entity]
         data[entity.ICUSTAY_id] = entity
     return data
 
-def icustay_id_time_dict_write(ICU_DATA: List[ICUSTAY_Entity]):
+def icustay_id_time_dict_write(ICU_DATA: List[ICUSTAY_Entity], path: str):
     data = dict()
     for entity in ICU_DATA:
         assert entity.ICUSTAY_id not in data
         data[entity.ICUSTAY_id] = entity.INTIME
 
-    for key in data:
-        print(f'{key},{data[key].decode()}')
+    with open(path, 'wt') as fout:
+        for key in data:
+            fout.write(f'{key},{data[key].decode()}\n')
 
 
 def pause(filename, type='stop', data=None):

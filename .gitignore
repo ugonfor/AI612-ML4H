@@ -3,4 +3,5 @@ dataset
 __pycache__
 filtered_dataset
 *.pkl
-
+share
+.vscode
