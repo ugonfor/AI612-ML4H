@@ -2,6 +2,9 @@ import numpy as np
 from typing import List, Set
 from type_def import ICUSTAY_Entity
 from datetime import datetime, timedelta
+import utils
+
+import pandas as pd
 
 def filtering_time(input_path: str, output_path: str):
     '''
@@ -223,8 +226,22 @@ def Filtering_CHARTEVENTS(input_path: str, output_path: str, icu_data: List[ICUS
         
         fout.write(line + b"\n")
 
-def init_CHARTEVENTS(icu_data : List[ICUSTAY_Entity]) -> List[ICUSTAY_Entity]:
-    pass
+def CHECK_CHARTEVENTS(icu_data : List[ICUSTAY_Entity], input_path: str) -> List[ICUSTAY_Entity]:
+
+    df = pd.read_csv(input_path)
+    si = set(df['ICUSTAY_ID'].to_list())
+
+    nodata_death = 0
+    nodata_alive = 0
+    for ent in icu_data:
+        if ent.ICUSTAY_id not in si:
+            if ent.label: 
+                nodata_death += 1
+            else:
+                nodata_alive += 1
+    
+
+    print(f'Total ICUSTAY_ID : {len(icu_data)} | No Chart Event : {nodata_alive + nodata_death} | No Chart Event Death: {nodata_death}  | No Chart Event Alive: {nodata_alive}')
 
 def test():
     N = 10
@@ -248,6 +265,7 @@ ICUSTAY_ID_TIME_PAIR_PATH = "./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv"
 ICU_DATA = None
 
 if __name__ == "__main__":
+    '''
     filtering_time(ICUSTAYS_PATH, FILTERED_ICUSTAYS_PATH)
     print("[1]")
     ICU_DATA = init_ICUSTAYS(FILTERED_ICUSTAYS_PATH)
@@ -256,10 +274,18 @@ if __name__ == "__main__":
     print("[3]")
     ICU_DATA = Label_check(ICU_DATA)
     print("[4]")
-
-    import utils
     utils.icustay_id_time_dict_write(ICU_DATA, ICUSTAY_ID_TIME_PAIR_PATH)
     print("[5]")
-    print("execute next commands:")
-    print("    g++ -o chartevents_filter ./chartevents_filter.cpp")
-    print("    ./chartevents_filter ./dataset/CHARTEVENTS.csv ./filtered_dataset/CHARTEVENTS.csv ./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv")
+
+    utils.pause('./ICU_DATA', type='stop', data=ICU_DATA)
+    # print("execute next commands:")
+    # print("    g++ -o chartevents_filter ./chartevents_filter.cpp")
+    # print("    ./chartevents_filter ./dataset/CHARTEVENTS.csv ./filtered_dataset/CHARTEVENTS.csv ./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv")
+    
+    CHECK_CHARTEVENTS(ICU_DATA, FILTERED_CHAREVENTS_PATH)
+    print("[6]")
+    
+    # execute EDA.ipynb
+    '''
+    pass
+    
