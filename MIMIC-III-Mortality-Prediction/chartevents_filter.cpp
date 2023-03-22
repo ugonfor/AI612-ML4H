@@ -6,7 +6,6 @@
 #include <string>
 
 #include <stdint.h>
-#include <time.h>
 #include <ctime>
 #include <iomanip>
 
@@ -25,6 +24,7 @@ ofstream outfile;
 void sigint_handler(int sig){
     infile.close();
     outfile.close();
+    printf("[!] SIGINT");
     exit(-1);
 }
 
@@ -49,7 +49,6 @@ bool init_filter_pair(const char* path){
         printf("id: %d / timestamp : %s\n", (*it).first, (*it).second.c_str());
     }
     */
-    
     return true;
 }
 
@@ -67,45 +66,52 @@ bool filter(string line){
     tmp = tmp.substr(tmp.find(",") + 1); // ITEMID
     tmp = tmp.substr(tmp.find(",") + 1); // CHARTTIME
 
-    cout << "[!] DEBUG " << "\n";
     // convert ICUSTAY TIME to timestamp
-    tm ICUSTAY_timestamp;
+    tm ICUSTAY_timestamp = {};
     //cout << ICUSTAY_ID_TIME_Map[id].c_str() << "\n";
-    if (strptime(ICUSTAY_ID_TIME_Map[id].c_str(), "%Y-%m-%d %H:%M:%S", &ICUSTAY_timestamp) == NULL) {
+    if (strptime(ICUSTAY_ID_TIME_Map[id].c_str(), "%Y-%m-%d %T", &ICUSTAY_timestamp) == NULL) {
         fprintf(stderr, "ID: %d / 2 strptime error\n", id);
         exit(-1);
     }
-    time_t INTIME = mktime(&ICUSTAY_timestamp);
+    int64_t INTIME = mktime(&ICUSTAY_timestamp);
 
     // convert CHARTEVENT TIME to timestamp
-    tm CHART_timestamp;
+    tm CHART_timestamp = {};
     //cout << tmp.substr(0, tmp.find(",")).c_str() << "\n";
-    if (strptime(tmp.substr(0, tmp.find(",")).c_str(), "%Y-%m-%d %H:%M:%S", &CHART_timestamp) == NULL) {
+    if (strptime(tmp.substr(0, tmp.find(",")).c_str(), "%Y-%m-%d %T", &CHART_timestamp) == NULL) {
         fprintf(stderr, "ID: %d / 1 strptime error\n", id);
         exit(-1);
     }
-    time_t CHARTTIME = mktime(&CHART_timestamp);
+    int64_t CHARTTIME = mktime(&CHART_timestamp);
 
     // make ICUSTAY INCOME TIME + 3h in timestamp
-    tm ICUSTAY_timestamp_3h = ICUSTAY_timestamp;
+    tm ICUSTAY_timestamp_3h = {};
+    ICUSTAY_timestamp_3h = ICUSTAY_timestamp;
     ICUSTAY_timestamp_3h.tm_hour += 3; // 3 hours
-    time_t INTIME_3h = mktime(&ICUSTAY_timestamp_3h);
+    int64_t INTIME_3h = mktime(&ICUSTAY_timestamp_3h);
     
     
-    // for debug
+
+    // time check
+    if ( CHARTTIME < INTIME){
+        /*
+        // for debug
+        cout << "ID : " << id << " | CHARTTIME(" << CHARTTIME << ") < INTIME(" << INTIME << ")\n";
+        cout << line << "\n";
+        */
+        return false;
+        // exit(-1);
+    }
+    if (INTIME_3h < CHARTTIME) return false;
+
     /*
+    // for debug
+    cout << "[!] DEBUG " << "\n";
     cout << "CHART :      " << CHARTTIME << "\n";
     cout << "INTIME :     " << INTIME << "\n";
     cout << "INTIME + 3 : " << INTIME_3h << "\n";
     cout << line << "\n";
     */
-
-    // time check
-    if ( CHARTTIME < INTIME){
-        printf("ID: %d / CHARTIME ERROR", id);
-        exit(-1);
-    }
-    if (INTIME_3h < CHARTTIME) return false;
 
     return true;
 }

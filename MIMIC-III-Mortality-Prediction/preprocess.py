@@ -155,6 +155,8 @@ def Label_check(icu_data : List[ICUSTAY_Entity]) -> List[ICUSTAY_Entity]:
     
     return icu_data
     
+# Don't Use
+# Since, too slow
 def Filtering_CHARTEVENTS(input_path: str, output_path: str, icu_data: List[ICUSTAY_Entity]):
     '''
     filtering the CHARTEVENTS table
@@ -246,23 +248,18 @@ ICUSTAY_ID_TIME_PAIR_PATH = "./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv"
 ICU_DATA = None
 
 if __name__ == "__main__":
-    # filtering_time(ICUSTAYS_PATH, FILTERED_ICUSTAYS_PATH)
-    # print("1")
-    # ICU_DATA = init_ICUSTAYS(FILTERED_ICUSTAYS_PATH)
-    # print("2")
-    # ICU_DATA = init_ADMISSIONS(ADMISSIONS_PATH, ICU_DATA)
-    # ICU_DATA = Label_check(ICU_DATA)
-
-    from utils import pause
-    ICU_DATA = pause('ICU_DATA', type='resume')
+    filtering_time(ICUSTAYS_PATH, FILTERED_ICUSTAYS_PATH)
+    print("[1]")
+    ICU_DATA = init_ICUSTAYS(FILTERED_ICUSTAYS_PATH)
+    print("[2]")
+    ICU_DATA = init_ADMISSIONS(ADMISSIONS_PATH, ICU_DATA)
+    print("[3]")
+    ICU_DATA = Label_check(ICU_DATA)
+    print("[4]")
 
     import utils
     utils.icustay_id_time_dict_write(ICU_DATA, ICUSTAY_ID_TIME_PAIR_PATH)
-
-    # g++ -o chartevents_filter ./chartevents_filter.cpp
-    # ./chartevents_filter ./dataset/CHARTEVENTS.csv ./filtered_dataset/CHARTEVENTS.csv ./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv
-    
-
-    # Filtering_CHARTEVENTS(CHAREVENTS_PATH, FILTERED_CHAREVENTS_PATH, ICU_DATA)
-
-    # ICU_DATA = pause('ICU_DATA', type='stop', data=ICU_DATA)
+    print("[5]")
+    print("execute next commands:")
+    print("    g++ -o chartevents_filter ./chartevents_filter.cpp")
+    print("    ./chartevents_filter ./dataset/CHARTEVENTS.csv ./filtered_dataset/CHARTEVENTS.csv ./filtered_dataset/ICUSTAY_ID_TIME_PAIR.csv")
