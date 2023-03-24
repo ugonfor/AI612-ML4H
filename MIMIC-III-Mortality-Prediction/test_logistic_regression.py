@@ -10,7 +10,7 @@ from type_def import ICUSTAY_Entity
 
 import pandas as pd
 
-ICU_DATA: List[ICUSTAY_Entity] = utils.pause("./ICU_DATA", type='resume')
+ICU_DATA: List[ICUSTAY_Entity] = utils.pause("./ICU_DATA_logistic", type='resume')
 
 
 def test():
@@ -30,7 +30,7 @@ def make_X_y(ICU_DATA):
                 array.append(np.mean(entity.chartevnet[ITEMID]))
         X.append(array)
     X = np.array(X)
-    
+
     y = []
     for entity in ICU_DATA:
         y.append(entity.label)
@@ -45,7 +45,8 @@ def predict():
     TEST_ICU_DATA = list(filter(lambda x: x.ICUSTAY_id % 10 in (8,9) , ICU_DATA)) 
 
     X,y = make_X_y(TRAIN_ICU_DATA)
-    
+    np.save('y_train', y)
+
     clf = LogisticRegression(random_state=0, max_iter=10000).fit(X,y)
     print(clf.score(X,y))
     print(roc_auc_score(y, clf.predict_proba(X)[:,1]))
@@ -58,6 +59,7 @@ def predict():
     print("="*50)
     
     X,y = make_X_y(TEST_ICU_DATA)
+    np.save('y_test', y)
     
     clf = LogisticRegression(random_state=0, max_iter=10000).fit(X,y)
     print(clf.score(X,y))
