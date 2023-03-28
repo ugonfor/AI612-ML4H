@@ -21,27 +21,32 @@ from torch.optim import Adam
 from dataloader_rnn import ICUDataset
 from torch.utils.data import DataLoader
 
-ITEMID_SET = {223751, 223752, 227341, 227342, 227343, 227344, 223761, 227345, 220179, 220180, 220181, 227346, 223769, 223770, 227367, 223791, 220210, 51, 52, 224828, 220224, 220739, 581, 220235, 223830, 87, 1126, 618, 113, 220277, 646, 223900, 223901, 676, 677, 678, 679, 8368, 5813, 5815, 184, 5817, 5819, 5820, 198, 226512, 211, 723, 226531, 742, 226543, 226544, 8441, 8448, 776, 777, 778, 779, 780, 811, 813, 224054, 224055, 224056, 224057, 224058, 224059, 829, 225087, 225092, 837, 225094, 225103, 225106, 226137, 8547, 8549, 8551, 227688, 8553, 8554, 224641, 220045, 220046, 220047, 220050, 220051, 220052, 224161, 224162, 225698, 224168, 454, 455, 456, 226253, 470, 492, 1529, 1535}
+df = pd.read_csv("./filtered_dataset/CHARTEVENTS.csv")
+df = df[df['VALUENUM'].isna() == False]
+ITEMID_SET = set(df['ITEMID'].value_counts().index)
 
+NORM = None
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class GRU(nn.Module):
     def __init__(self, d_itemid, hidden_dim, n_layers=1, n_class=2):
         super(GRU, self).__init__()
 
     
-        self.itemid_embedding = nn.Embedding(101, d_itemid)
+        self.itemid_embedding = nn.Embedding(len(ITEMID_SET) + 1, d_itemid)
         self.gru = nn.GRU(1 + d_itemid + 1, 2 * hidden_dim, n_layers, batch_first=True, ) # charttime:itemid:value
         self.outer = nn.Linear(2 * hidden_dim, hidden_dim)
         self.classifier = nn.Linear(hidden_dim, n_class)
-
     def forward(self, x):
         x_time = x['time']
+        batch_size = x_time.shape[0]
         x_itemid = x['itemid']
         x_val = x['valuenum']
         emb_itemid = self.itemid_embedding(x_itemid)
 
-        x_time = x_time.reshape((10,100,1))
-        x_val = x_val.reshape((10,100,1))
+        x_time = x_time.reshape((batch_size,100,1))
+        x_val = x_val.reshape((batch_size,100,1))
         input = torch.cat((x_time, emb_itemid, x_val), dim=2).float()
 
         out, _ = self.gru(input)
@@ -94,19 +99,22 @@ def make_dataset_file():
         fout_train_x.write("\n")
         fout_train_y.write(f"{entity.label}\n")
     print(no_chart)
-    
-def train():
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = GRU(32, 32)
+
+
+def train(model, epoch, lr, l2):
+
+    total_predict = torch.tensor([]).to(device)
+    print(device)
+    model = model.to(device)
     model.train()
     model.zero_grad()
 
 
-    EPOCHS = 10
-    dataset = ICUDataset('./X_train_rnn.npy', './y_train.npy', 100, ITEMID_SET)
+    EPOCHS = epoch
+    dataset = ICUDataset('./X_train_rnn.npy', './y_train.npy', 100, ITEMID_SET, NORM)
     data_loader = DataLoader(dataset, batch_size=10, shuffle=True) 
-    optimizer = Adam(model.parameters(), lr=1e-3)
-
+    optimizer = Adam(model.parameters(), lr=lr, weight_decay=l2)
+    
     for epoch in range(EPOCHS):
         total_batch = 0
         true_pred = 0
@@ -127,7 +135,8 @@ def train():
             pred = model(data)
             
             # loss
-            loss = F.binary_cross_entropy_with_logits(pred, labels)
+            weight = torch.Tensor([10, 10]).to(device)
+            loss = F.binary_cross_entropy_with_logits(pred, labels, weight=weight)
             
             # optimizer 
             optimizer.zero_grad()
@@ -135,19 +144,108 @@ def train():
             optimizer.step()
             
             # for logging
-            pred_y = torch.max(pred,1)[1]
+            pred_y = torch.max(pred,1)[1].to(device)
+
+            total_predict = torch.cat((total_predict, pred_y))
+
             labels = labels.max(1)[1]
             true_pred += (labels == pred_y).sum().item()
-
+        
             total_loss += loss.item()
 
             # batch_size
             total_batch += len(batch['time'])
             batch_cnt += 1
-            
+
         # logging
         print(f"[!] Epoch{epoch} | batch{batch_cnt} | Train loss : {total_loss:.4f} | Train Acc : {true_pred/total_batch * 100:.2f}%")
+    return model
+
+def test(model, device, dataset = ['./X_test_rnn.npy', './y_test.npy']):
+    print(device)
+    total_predict = torch.tensor([]).to(device)
+    model.eval()
+    
+    test_dataset = ICUDataset(dataset[0], dataset[1], 100, ITEMID_SET, NORM)
+    test_data_loader = DataLoader(test_dataset, batch_size=10,  shuffle=False) 
+
+    true_pred_test = 0
+    total_batch_test = 0
+    for batch in test_data_loader:
+        # data bach
+        data = {
+            'time': batch['time'].to(device),
+            'itemid': batch['itemid'].to(device),
+            'valuenum': batch['valuenum'].to(device),
+        }
+        #label
+        labels = batch['label'].to(device)
         
+        # prediction
+        pred = model(data)
+        
+        # for logging
+        pred = torch.sigmoid(pred)
+        tmp = torch.Tensor(pred)
+        tmp[:,0] = tmp[:,0]*0.225
+        pred = tmp
+
+        pred_y = torch.max(pred,1)[1].to(device)
+        total_predict = torch.cat((total_predict, pred_y))
+        labels = labels.max(1)[1]
+        true_pred_test += (labels == pred_y).sum().item()
+        total_batch_test += len(batch['time'])
+    
+    # logging
+    print(f"[!] TEST ACCURACY {true_pred_test/total_batch_test *100:.2f}%")
+    
+    return total_predict
+
+
 if __name__ == "__main__":
-    #make_dataset_file()
-    train()
+    # make_dataset_file()
+    e_dim = 256
+    h_dim = 64
+    epoch = 15 # 20 좋았음
+    lr=1e-3
+    l2=1e-5
+    print(e_dim, h_dim, epoch, lr, l2)
+    
+    # model = GRU(e_dim, h_dim,)
+    # m = train(model, epoch, lr, l2)
+    # utils.save_model(m, './rnn.pth')
+    
+
+    # test
+    print("!!!?")
+    device = 'cuda'
+    model = GRU(e_dim, h_dim).to(device)
+    utils.load_model(model, './rnn-best.pth')
+
+    
+    # train dataset
+    
+    tot_pred=test(model, device, ['./X_train_rnn.npy', './y_train.npy'])
+    print(tot_pred)
+    
+    pred = np.array(tot_pred.cpu())
+    label = np.load('./y_train.npy')
+    
+    print(roc_auc_score(label, pred))
+    print(average_precision_score(label, pred))
+    print(pd.DataFrame(pred).value_counts())
+    print(pd.DataFrame(label).value_counts())
+    print(np.sum(np.abs(label-pred)))
+    
+    # test dataset
+    tot_pred=test(model, device, ['./X_test_rnn.npy', './y_test.npy'])
+    
+    pred = np.array(tot_pred.cpu())
+    label = np.load('./y_test.npy')
+    
+    print(roc_auc_score(label, pred))
+    print(average_precision_score(label, pred))
+    print(pd.DataFrame(pred).value_counts())
+    print(pd.DataFrame(label).value_counts())
+    print(np.sum(np.abs(label-pred)))
+

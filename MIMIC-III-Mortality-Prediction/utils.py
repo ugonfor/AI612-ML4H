@@ -2,6 +2,11 @@ from typing import List, Dict
 from type_def import ICUSTAY_Entity
 
 import pickle
+import torch
+import os
+import random
+import time
+import numpy as np
 
 def hadm_id_dict(ICU_DATA: List[ICUSTAY_Entity]) -> Dict[int, ICUSTAY_Entity]:
     data = dict()
@@ -39,3 +44,21 @@ def pause(filename, type='stop', data=None):
     else:
         with open(f'{filename}.pkl', 'rb') as fin:
             return pickle.load(fin)
+        
+
+def set_seed(seed):
+    
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
+def save_model(model, model_path):
+    state = {
+        'model': model.state_dict()
+    }
+    torch.save(state, model_path)
+
+
+def load_model(model, model_path):
+    state = torch.load(model_path)
+    model.load_state_dict(state['model'])
